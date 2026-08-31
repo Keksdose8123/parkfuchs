@@ -10,78 +10,171 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#16583f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700;800&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
+/* Farbwelt: Fahrbahn und Markierungsfarbe. Kosten tragen die Farbe der Buchtkante. */
 :root{
-  --bg:#f4f5f3; --karte:#fff; --text:#16201a; --leise:#5d6b62;
-  --rand:#dde2dd; --akzent:#16583f; --frei:#1b6b4a; --geld:#a8641b; --warn:#b03a2e;
+  --grund:#eef0ec; --flaeche:#ffffff; --text:#14181a; --leise:#5f6b63; --linie:#d8ddd6;
+  --marke:#16583f; --auf-marke:#ffffff;
+  --frei:#17694a; --zahlen:#a86d17; --unklar:#7e877f; --warn:#b23a2b;
+  --schatten:0 1px 2px rgba(20,24,26,.06), 0 8px 20px -12px rgba(20,24,26,.30);
+  --gehoben:0 2px 4px rgba(20,24,26,.08), 0 16px 32px -14px rgba(20,24,26,.42);
+  --schrift:"Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --schmal:"Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
 }
 @media (prefers-color-scheme:dark){
-  :root{ --bg:#12160f; --karte:#1b2118; --text:#e8ece5; --leise:#98a595;
-         --rand:#2c352a; --akzent:#5fbf8f; --frei:#5fbf8f; --geld:#e0a35c; --warn:#e8776a; }
-  button{color:#12160f}
-  .zweit,.schalter{color:var(--akzent)}
-  .schalter[aria-pressed="true"]{color:#12160f}
+  :root{
+    --grund:#101315; --flaeche:#191d1f; --text:#e9ede7; --leise:#98a29a; --linie:#2a2f2c;
+    --marke:#5fbe8c; --auf-marke:#0e1211;
+    --frei:#5fbe8c; --zahlen:#e0a45c; --unklar:#8a938c; --warn:#e8776a;
+    --schatten:0 1px 2px rgba(0,0,0,.5), 0 8px 20px -12px rgba(0,0,0,.8);
+    --gehoben:0 2px 6px rgba(0,0,0,.6), 0 18px 36px -14px rgba(0,0,0,.95);
+  }
 }
 *{box-sizing:border-box}
-body{margin:0;padding:16px 16px calc(24px + env(safe-area-inset-bottom));
-  background:var(--bg);color:var(--text);
-  font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-body.navi{padding-top:calc(158px + env(safe-area-inset-top))}
-header{display:flex;align-items:center;gap:10px;margin:2px 0 14px}
-header img{width:34px;height:34px;border-radius:9px}
-h1{font-size:21px;margin:0;letter-spacing:-.01em}
-h1 span{display:block;font-size:13px;font-weight:400;color:var(--leise);letter-spacing:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; padding:14px 14px calc(28px + env(safe-area-inset-bottom));
+  background:var(--grund); color:var(--text);
+  font:400 16px/1.45 var(--schrift);
+  -webkit-font-smoothing:antialiased;
+}
+body.navi{padding-top:calc(150px + env(safe-area-inset-top))}
+
+/* ---------- Kopf ---------- */
+kopf, .kopf-zeile{display:flex}
+.kopf-zeile{align-items:center;gap:10px;margin:2px 0 16px}
+.kopf-zeile img{width:32px;height:32px;border-radius:8px;flex:none}
+.wortmarke{
+  font:700 21px/1 var(--schmal); letter-spacing:.13em; text-transform:uppercase; margin:0;
+}
+
+/* ---------- Eingabe ---------- */
 form{display:flex;gap:8px}
-input,button{font:inherit;border-radius:12px;border:1px solid var(--rand)}
-input{flex:1;min-width:0;padding:14px;background:var(--karte);color:var(--text)}
-button{padding:14px 16px;background:var(--akzent);color:#fff;border-color:transparent;
-  font-weight:600;cursor:pointer;-webkit-appearance:none}
-button:disabled{opacity:.5}
-.mikro{padding:14px 13px;font-size:19px;line-height:1}
-.zweit{background:transparent;color:var(--akzent);border-color:var(--rand);
-  width:100%;margin-top:8px;font-weight:500}
-#status{margin:14px 0;color:var(--leise);font-size:15px}
-#status b{color:var(--text);font-weight:600}
+input,button{font:inherit;border-radius:11px;border:1px solid var(--linie)}
+input{
+  flex:1;min-width:0;padding:13px 14px;background:var(--flaeche);color:var(--text);
+  box-shadow:var(--schatten);
+}
+input::placeholder{color:var(--leise)}
+input:focus-visible,button:focus-visible,.bucht:focus-visible,summary:focus-visible{
+  outline:3px solid var(--marke);outline-offset:2px
+}
+button{
+  padding:13px 16px;background:var(--marke);color:var(--auf-marke);border-color:transparent;
+  font-weight:600;cursor:pointer;-webkit-appearance:none;
+}
+.mikro{padding:13px 12px;font-size:18px;line-height:1}
+.zweit{
+  background:transparent;color:var(--marke);border-color:var(--linie);
+  width:100%;margin-top:8px;font-weight:600;box-shadow:none;
+}
+
+/* ---------- Statusband ---------- */
+#status{
+  margin:16px 0 12px;color:var(--leise);
+  font:500 13px/1.5 var(--schrift); letter-spacing:.02em;
+}
+#status b{color:var(--text);font-weight:700}
 #status.fehler{color:var(--warn)}
-#schalter{display:none;gap:8px;margin:14px 0}
+
+#schalter{display:none;gap:7px;margin:0 0 14px}
 #schalter.an{display:flex}
-.schalter{flex:1;padding:11px 4px;font-size:13.5px;white-space:nowrap;text-align:center;background:var(--karte);
-  color:var(--leise);border:1px solid var(--rand);border-radius:12px;font-weight:500;cursor:pointer}
-.schalter[aria-pressed="true"]{background:var(--akzent);color:#fff;border-color:transparent}
-#landkarte{height:40vh;min-height:210px;border-radius:14px;border:1px solid var(--rand);
-  margin-bottom:12px;overflow:hidden;z-index:0}
-.leaflet-popup-content{margin:10px 12px;font:14px/1.4 system-ui,sans-serif}
-.leaflet-popup-content a{color:#16583f;font-weight:600}
-ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
-li{background:var(--karte);border:1px solid var(--rand);border-radius:14px;overflow:hidden}
-.ziel{display:block;padding:14px;color:inherit;cursor:pointer}
-.ziel:focus-visible{outline:3px solid var(--akzent);outline-offset:-3px}
-details{border-top:1px solid var(--rand)}
-summary{padding:10px 14px;font-size:14px;color:var(--leise);cursor:pointer}
-.tags{padding:2px 14px 10px;font-size:13px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
+.schalter{
+  flex:1;padding:9px 4px;background:var(--flaeche);color:var(--leise);
+  border:1px solid var(--linie);border-radius:9px;cursor:pointer;white-space:nowrap;
+  font:600 12px/1.2 var(--schrift); letter-spacing:.04em; text-transform:uppercase;
+}
+.schalter[aria-pressed="true"]{background:var(--marke);color:var(--auf-marke);border-color:transparent}
+
+/* ---------- Karte ---------- */
+#landkarte{
+  height:38vh;min-height:200px;border-radius:13px;border:1px solid var(--linie);
+  margin-bottom:14px;overflow:hidden;z-index:0;box-shadow:var(--schatten);
+}
+.leaflet-popup-content{margin:9px 11px;font:500 13px/1.4 var(--schrift)}
+
+/* ---------- Buchten ---------- */
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+li{
+  position:relative;background:var(--flaeche);border:1px solid var(--linie);
+  border-radius:12px;overflow:hidden;box-shadow:var(--schatten);
+  transition:box-shadow .18s ease, transform .18s ease;
+}
+/* Die gemalte Buchtkante - traegt die Kosten als Farbe */
+li::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:5px;
+  background:var(--kante,var(--unklar));transition:width .18s ease;
+}
+li.gewaehlt{box-shadow:var(--gehoben);transform:translateY(-1px)}
+li.gewaehlt::before{width:11px}
+li.gewaehlt .bucht{background:color-mix(in srgb, var(--kante) 7%, transparent)}
+
+.bucht{
+  display:flex;align-items:center;gap:12px;padding:13px 14px 13px 19px;
+  cursor:pointer;transition:background .18s ease;
+}
+.text{min-width:0;flex:1}
+.name{
+  font:600 16.5px/1.25 var(--schrift);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.art{font:500 12px/1.2 var(--schrift);letter-spacing:.05em;text-transform:uppercase;color:var(--leise);margin-bottom:3px}
+.meta{margin-top:5px;font:400 13.5px/1.45 var(--schrift);color:var(--leise);
+  display:flex;flex-wrap:wrap;gap:2px 9px}
+.frei{color:var(--frei);font-weight:600}
+.geld{color:var(--zahlen);font-weight:600}
+.hinweis{color:var(--warn);font-weight:600}
+.offen{color:var(--unklar)}
+
+/* Entfernung als Schlagzeile: im Auto ist sie die Entscheidungsgroesse, nicht der Name. */
+.weite{flex:none;text-align:right;line-height:.92}
+.weite .zahl{font:700 33px/1 var(--schmal);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.weite .einheit{display:block;margin-top:3px;font:600 10.5px/1 var(--schrift);
+  letter-spacing:.14em;text-transform:uppercase;color:var(--leise)}
+.weite .fuss{display:block;margin-top:5px;font:500 11.5px/1 var(--schrift);color:var(--leise)}
+
+/* Der Knopf gehoert nur an die gewaehlte Bucht - 25 gestapelte Knoepfe sind Laerm. */
+.aktion{display:none;gap:8px;padding:0 14px 12px 19px}
+li.gewaehlt .aktion{display:flex}
+.aktion button{flex:1;padding:11px 12px;border-radius:10px;font-weight:700;font-size:15px}
+
+details{border-top:1px solid var(--linie)}
+summary{
+  padding:9px 14px 9px 19px;color:var(--leise);cursor:pointer;
+  font:500 12.5px/1.2 var(--schrift);letter-spacing:.04em;text-transform:uppercase;
+}
+.tags{padding:2px 14px 11px 19px;font:400 13px/1.5 var(--schrift);
+  display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
 .tags .k{color:var(--leise);word-break:break-all}
 .tags .v{word-break:break-word}
-details .raus{display:inline-block;margin:0 14px 12px;font-size:13px;color:var(--akzent)}
-.offen{color:var(--leise);font-style:italic}
-.kopf{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-.name{font-weight:600}
-.weg{white-space:nowrap;color:var(--akzent);font-weight:600}
-.zeile{margin-top:6px;font-size:14.5px;color:var(--leise);display:flex;flex-wrap:wrap;gap:4px 10px}
-.frei{color:var(--frei);font-weight:600}
-.geld{color:var(--geld);font-weight:600}
-.hinweis{color:var(--warn);font-weight:600}
-footer{margin-top:22px;font-size:13px;color:var(--leise);line-height:1.5}
+.raus{display:inline-block;margin:0 14px 12px 19px;font:600 12.5px/1 var(--schrift);color:var(--marke)}
 
-/* Routenführung: immer dunkelgrün auf weiß, damit sie in beiden Themen lesbar bleibt */
-#fuehrung{position:fixed;top:0;left:0;right:0;z-index:1000;background:#16583f;color:#fff;
-  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;box-shadow:0 6px 22px rgba(0,0,0,.28)}
-#fuehrung .anweisung{font-size:21px;font-weight:700;line-height:1.25}
-#fuehrung .entfernung{font-size:34px;font-weight:800;line-height:1.1;margin-top:2px}
+footer{margin-top:24px;font:400 12.5px/1.6 var(--schrift);color:var(--leise)}
+
+/* ---------- Routenführung ---------- */
+#fuehrung{
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  background:#0f4531;color:#fff;
+  padding:calc(13px + env(safe-area-inset-top)) 16px 13px;
+  box-shadow:0 8px 26px rgba(0,0,0,.35);
+}
+#fuehrung .anweisung{font:700 21px/1.2 var(--schmal);letter-spacing:.01em}
+#fuehrung .entfernung{font:800 40px/1 var(--schmal);font-variant-numeric:tabular-nums;margin-top:3px}
 #fuehrung .rest{display:flex;justify-content:space-between;align-items:center;
-  margin-top:10px;font-size:14px;gap:12px}
-#fuehrung button{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);
-  color:#fff;padding:8px 14px;font-size:14px;font-weight:600;border-radius:10px}
+  margin-top:11px;font:500 13px/1 var(--schrift);gap:12px;color:rgba(255,255,255,.85)}
+#fuehrung button{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);
+  color:#fff;padding:8px 14px;font:600 13px/1 var(--schrift);border-radius:9px}
+
+/* ---------- Bewegung: einmal beim Erscheinen, sonst nichts ---------- */
+@keyframes einfahren{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+li.neu{animation:einfahren .32s cubic-bezier(.2,.7,.3,1) backwards}
+@media (prefers-reduced-motion:reduce){
+  *,*::before{animation:none !important;transition:none !important}
+}
 </style>
 </head>
 <body>
@@ -92,10 +185,10 @@ footer{margin-top:22px;font-size:13px;color:var(--leise);line-height:1.5}
   <div class="rest"><span id="fRest"></span><button id="fEnde" type="button">Beenden</button></div>
 </div>
 
-<header>
+<div class="kopf-zeile">
   <img src="icon-192.png" alt="">
-  <h1>Parkfuchs<span>Parkmöglichkeiten rund um dein Ziel</span></h1>
-</header>
+  <h1 class="wortmarke">Parkfuchs</h1>
+</div>
 
 <form id="formular">
   <input id="eingabe" type="search" enterkeyhint="search" autocomplete="off"
@@ -118,9 +211,9 @@ footer{margin-top:22px;font-size:13px;color:var(--leise);line-height:1.5}
 <button class="zweit" id="weiter" type="button" hidden>Umkreis verdoppeln</button>
 
 <footer>
-  Daten: OpenStreetMap, Route von OSRM &middot; Entfernung in der Liste ist Luftlinie zum Ziel.<br>
-  Freie Pl&auml;tze in Echtzeit gibt es hier nicht &mdash; die Daten sagen, <em>wo</em> geparkt werden darf
-  und zu welchen Bedingungen.
+  Daten: OpenStreetMap, Route von OSRM. Entfernung ist Luftlinie zum Ziel.<br>
+  Freie Pl&auml;tze in Echtzeit gibt es hier nicht &mdash; die Daten sagen, <em>wo</em> geparkt
+  werden darf und zu welchen Bedingungen.
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -135,23 +228,23 @@ const MAX = 25;
 const $ = id => document.getElementById(id);
 const sicher = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const an = id => $(id).getAttribute('aria-pressed') === 'true';
+const ruhig = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let radius = 1000, ziel = null, treffer = [], privatAus = 0, angezeigt = [];
 // Die Standortabfrage laeuft bis zu 10 s. Tippt man derweil ein Ziel ein, darf ihre
 // spaete Antwort das Ergebnis nicht mehr ueberschreiben.
 let suchNr = 0;
-let landkarte = null, ebene = null;
+let landkarte = null, ebene = null, marker = [], gewaehlt = -1;
 
 function zeigen(html, fehler) {
   $('status').innerHTML = html;
   $('status').className = fehler ? 'fehler' : '';
 }
 
-function strecke(m) {
-  const fuss = Math.max(1, Math.round(m / 80));   // ~5 km/h
-  const weg = m < 1000 ? m + ' m' : (m / 1000).toFixed(1).replace('.', ',') + ' km';
-  return weg + ' · ' + fuss + ' Min';
-}
+const kanteVon = p => p.gebuehr === 'kostenlos' ? 'var(--frei)'
+                    : p.gebuehr === 'gebuehrenpflichtig' ? 'var(--zahlen)' : 'var(--unklar)';
+const punktVonKosten = p => p.gebuehr === 'kostenlos' ? '#17694a'
+                    : p.gebuehr === 'gebuehrenpflichtig' ? '#c07818' : '#7e877f';
 
 const naviLink = p =>
   'https://www.google.com/maps/dir/?api=1&destination=' + p.lat + ',' + p.lon + '&travelmode=driving';
@@ -273,23 +366,29 @@ async function laden() {
 
 /* ---------- Darstellung --------------------------------------------------- */
 
+function weiteHtml(m) {
+  const km = m >= 1000;
+  const zahl = km ? (m / 1000).toFixed(1).replace('.', ',') : m;
+  return '<div class="weite"><span class="zahl">' + zahl + '</span>'
+       + '<span class="einheit">' + (km ? 'km' : 'm') + '</span>'
+       + '<span class="fuss">' + Math.max(1, Math.round(m / 80)) + ' Min zu Fuß</span></div>';
+}
+
 function eintrag(p, nr) {
   const teile = [];
   if (p.gebuehr === 'kostenlos') {
     teile.push('<span class="frei">kostenlos</span>');
   } else if (p.gebuehr === 'gebuehrenpflichtig') {
-    // Preis steht in OSM selten drin. Wenn doch, ist er die wichtigste Angabe der Karte.
+    // Preis steht in OSM selten drin. Wenn doch, ist er die wichtigste Angabe der Bucht.
     teile.push(p.preis
       ? '<span class="geld">' + sicher(p.preis) + '</span>'
       : '<span class="geld">kostenpflichtig</span> <span class="offen">Preis nicht hinterlegt</span>');
   } else {
     teile.push('<span class="offen">Gebühr nicht hinterlegt</span>');
   }
-
   if (p.zugang === 'Anwohner') teile.push('<span class="hinweis">nur Anwohner</span>');
   else if (p.zugang === 'Kunden') teile.push('<span class="hinweis">nur Kunden</span>');
   else if (p.zugang === 'Behindertenparkplatz') teile.push('<span class="hinweis">Behindertenparkplatz</span>');
-
   if (p.zeiten) teile.push('geöffnet ' + sicher(p.zeiten));
   if (p.maxdauer) teile.push('max. ' + sicher(p.maxdauer));
   if (p.kapazitaet) teile.push(p.kapazitaet + (p.kapazitaet === 1 ? ' Platz' : ' Plätze'));
@@ -301,11 +400,15 @@ function eintrag(p, nr) {
     '<span class="k" title="' + sicher(k) + '">' + sicher(begriff(k)) + '</span>'
     + '<span class="v">' + sicher(wertText(k, p.tags[k])) + '</span>').join('');
 
-  return '<li><div class="ziel" role="button" tabindex="0" data-nr="' + nr + '">'
-    + '<div class="kopf"><span class="name">' + (p.name ? sicher(p.name) : p.art) + '</span>'
-    + '<span class="weg">' + strecke(p.meter) + '</span></div>'
-    + '<div class="zeile"><span>' + p.art + '</span>'
-    + teile.map(t => '<span>' + t + '</span>').join('') + '</div></div>'
+  return '<li class="neu" id="bucht' + nr + '" style="--kante:' + kanteVon(p) + ';animation-delay:'
+    + (ruhig() ? 0 : Math.min(nr, 12) * 28) + 'ms">'
+    + '<div class="bucht" role="button" tabindex="0" data-nr="' + nr + '" aria-expanded="false">'
+    + '<div class="text">'
+    + (p.name ? '<div class="art">' + p.art + '</div>' : '')
+    + '<div class="name">' + (p.name ? sicher(p.name) : p.art) + '</div>'
+    + '<div class="meta">' + teile.map(t => '<span>' + t + '</span>').join('') + '</div></div>'
+    + weiteHtml(p.meter) + '</div>'
+    + '<div class="aktion"><button type="button" data-los="' + nr + '">Losfahren</button></div>'
     + '<details><summary>alle Angaben (' + schluessel.length + ')</summary>'
     + '<div class="tags">' + rohdaten + '</div>'
     + '<a class="raus" href="' + naviLink(p) + '" target="_blank" rel="noopener">in Google Maps öffnen</a> '
@@ -313,9 +416,6 @@ function eintrag(p, nr) {
     + '<a class="raus" href="https://www.openstreetmap.org/' + p.id + '" target="_blank" rel="noopener">bei OpenStreetMap nachtragen</a>'
     + '</details></li>';
 }
-
-const farbe = p => p.gebuehr === 'kostenlos' ? '#1b6b4a'
-               : p.gebuehr === 'gebuehrenpflichtig' ? '#c07818' : '#7d8b82';
 
 function kartenAufbauen() {
   if (landkarte) return true;
@@ -332,26 +432,50 @@ function kartenZeichnen(liste) {
   if (!kartenAufbauen()) { $('landkarte').hidden = true; return; }
   if (ebene) ebene.remove();
   ebene = L.layerGroup().addTo(landkarte);
+  marker = [];
 
   const punkte = [[ziel.lat, ziel.lon]];
   L.circleMarker([ziel.lat, ziel.lon], { radius: 9, color: '#fff', weight: 3,
-    fillColor: '#b03a2e', fillOpacity: 1 }).addTo(ebene).bindPopup('<b>Dein Ziel</b>');
+    fillColor: '#b23a2b', fillOpacity: 1 }).addTo(ebene).bindTooltip('Dein Ziel');
 
   liste.forEach(function (p, nr) {
     punkte.push([p.lat, p.lon]);
-    L.circleMarker([p.lat, p.lon], { radius: 8, color: '#fff', weight: 2,
-      fillColor: farbe(p), fillOpacity: 1 }).addTo(ebene).bindPopup(
-        '<b>' + (p.name ? sicher(p.name) : p.art) + '</b><br>' + strecke(p.meter)
-        + '<br><a href="#" onclick="naviStarten(angezeigt[' + nr + ']);return false;">Hierhin navigieren</a>');
+    const m = L.circleMarker([p.lat, p.lon], { radius: 8, color: '#fff', weight: 2,
+      fillColor: punktVonKosten(p), fillOpacity: 1 }).addTo(ebene);
+    m.bindTooltip((p.name ? p.name : p.art) + ' · ' + p.meter + ' m');
+    // Antippen zeigt den Eintrag unten - eine Detailflaeche, nicht zwei.
+    m.on('click', function () { auswaehlen(nr, true); });
+    marker.push(m);
   });
 
   landkarte.fitBounds(L.latLngBounds(punkte).pad(0.15));
   setTimeout(function () { landkarte.invalidateSize(); }, 60);
 }
 
+// Verbindet Karte und Liste: eine Bucht ist gewaehlt, ihre Markierung waechst mit.
+function auswaehlen(nr, hinscrollen) {
+  if (gewaehlt >= 0) {
+    const alt = $('bucht' + gewaehlt);
+    if (alt) alt.classList.remove('gewaehlt');
+    if (marker[gewaehlt]) marker[gewaehlt].setStyle({ radius: 8, weight: 2 });
+  }
+  if (gewaehlt === nr) { gewaehlt = -1; return; }    // nochmal antippen hebt die Wahl auf
+  gewaehlt = nr;
+  const el = $('bucht' + nr);
+  if (el) el.classList.add('gewaehlt');
+  if (marker[nr]) marker[nr].setStyle({ radius: 12, weight: 4 }).bringToFront();
+  // Leaflet holt sich beim Antippen den Tastaturfokus; der Browser scrollt daraufhin die
+  // Karte zurueck ins Bild. Darum erst danach springen, sonst verpufft der Sprung.
+  if (hinscrollen && el)
+    // Ausdruecklich ohne Animation: weiches Scrollen faellt in manchen Ansichten
+    // wirkungslos aus, und ein Sprung, der nicht stattfindet, ist der schlimmere Fehler.
+    setTimeout(function () { el.scrollIntoView({ block: 'center', behavior: 'auto' }); }, 60);
+}
+
 function zeichnen(neu) {
   const passend = filtern(treffer, an('fKostenlos'), an('fAnwohner'));
   angezeigt = passend.slice(0, MAX);
+  gewaehlt = -1;
 
   $('schalter').classList.toggle('an', treffer.length > 0);
   $('weiter').hidden = passend.length >= 10;   // nur anbieten, wenn es wirklich duenn ist
@@ -361,7 +485,7 @@ function zeichnen(neu) {
     $('landkarte').hidden = true;
     zeigen(treffer.length
       ? 'Alle ' + treffer.length + ' Treffer sind durch die Filter ausgeblendet.'
-      : 'Nichts gefunden im Umkreis von ' + radius + ' m.', true);
+      : 'Nichts gefunden im Umkreis von ' + radius + ' m. Umkreis verdoppeln?', true);
     return;
   }
 
@@ -376,6 +500,7 @@ function zeichnen(neu) {
 
   $('liste').innerHTML = angezeigt.map(eintrag).join('');
   kartenZeichnen(angezeigt);
+  auswaehlen(0, false);          // die naechste Bucht ist vorgewaehlt und sofort befahrbar
   if (neu) ansagen(fundAnsage(angezeigt[0]));
 }
 
@@ -404,7 +529,7 @@ function routeMalen() {
   if (!kartenAufbauen()) return;
   if (fuehrung.linie) fuehrung.linie.remove();
   fuehrung.linie = L.polyline(fuehrung.route.linie,
-    { color: '#16583f', weight: 6, opacity: .85 }).addTo(landkarte);
+    { color: '#0f4531', weight: 6, opacity: .85 }).addTo(landkarte);
   landkarte.fitBounds(fuehrung.linie.getBounds().pad(0.12));
 }
 
@@ -505,8 +630,9 @@ function naviPosition(pos, stumm) {
 
   if (i === r.schritte.length - 1 && d < 30) {
     ansagen('Ziel erreicht. Viel Glück beim Einparken.');
+    const name = fuehrung.ziel.name || fuehrung.ziel.art;
     naviBeenden();
-    zeigen('Angekommen bei <b>' + sicher(fuehrung.ziel.name || fuehrung.ziel.art) + '</b>.');
+    zeigen('Angekommen bei <b>' + sicher(name) + '</b>.');
   }
 }
 
@@ -526,13 +652,15 @@ $('fEnde').onclick = function () { naviBeenden(); zeigen('Navigation beendet.');
 /* ---------- Bedienung ----------------------------------------------------- */
 
 $('liste').addEventListener('click', function (e) {
-  const el = e.target.closest('.ziel');
-  if (el) naviStarten(angezeigt[+el.dataset.nr]);
+  const los = e.target.closest('[data-los]');
+  if (los) { naviStarten(angezeigt[+los.dataset.los]); return; }
+  const b = e.target.closest('.bucht');
+  if (b) auswaehlen(+b.dataset.nr, false);
 });
 $('liste').addEventListener('keydown', function (e) {
   if (e.key !== 'Enter' && e.key !== ' ') return;
-  const el = e.target.closest('.ziel');
-  if (el) { e.preventDefault(); naviStarten(angezeigt[+el.dataset.nr]); }
+  const b = e.target.closest('.bucht');
+  if (b) { e.preventDefault(); auswaehlen(+b.dataset.nr, false); }
 });
 
 $('formular').onsubmit = async function (e) {
