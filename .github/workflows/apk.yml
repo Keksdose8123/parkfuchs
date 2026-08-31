@@ -2,6 +2,10 @@ name: APK bauen
 
 # Der GitHub-Runner bringt Java und das Android-SDK schon mit. Damit muss lokal
 # nichts installiert werden - das fertige APK haengt danach unter "Releases".
+#
+# Signiert wird mit einem festen Schluessel aus den Repo-Geheimnissen, nicht mit
+# dem wechselnden Debug-Schluessel. Nur so laesst sich eine neue Fassung ueber
+# eine bereits installierte legen, ohne vorher zu deinstallieren.
 
 on:
   push:
@@ -42,6 +46,14 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Versionsnummer hochzaehlen
+        run: |
+          # Ohne steigende versionCode verweigert Android das Update ueber eine
+          # bereits installierte Fassung.
+          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \"1.0\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
+          grep -E "versionCode|versionName" android/app/build.gradle
+
       - name: Startsymbole setzen
         run: npx @capacitor/assets generate --android --assetPath assets
 
@@ -49,9 +61,25 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
           cd ..
-          mv android/app/build/outputs/apk/debug/app-debug.apk parkfuchs.apk
+          ls -l android/app/build/outputs/apk/release/
+
+      - name: Signieren
+        env:
+          SCHLUESSEL: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KSPW: ${{ secrets.ANDROID_KEYSTORE_PASSWORT }}
+        run: |
+          test -n "$SCHLUESSEL" || { echo "Geheimnis ANDROID_KEYSTORE_B64 ist leer"; exit 1; }
+          WERKZEUG=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n1)
+          echo "$SCHLUESSEL" | base64 -d > schluessel.p12
+          UNSIGNIERT=$(ls android/app/build/outputs/apk/release/*.apk | head -n1)
+          "$WERKZEUG/zipalign" -p -f 4 "$UNSIGNIERT" ausgerichtet.apk
+          "$WERKZEUG/apksigner" sign \
+            --ks schluessel.p12 --ks-type PKCS12 --ks-key-alias parkfuchs \
+            --ks-pass env:KSPW --key-pass env:KSPW \
+            --out parkfuchs.apk ausgerichtet.apk
+          rm -f schluessel.p12 ausgerichtet.apk
 
       # Das fertige Paket selbst pruefen, statt darauf zu vertrauen, dass der Bau
       # schon stimmt. Schlaegt eine dieser Pruefungen fehl, gibt es keine Freigabe.
@@ -62,9 +90,14 @@ jobs:
           "$WERKZEUG/aapt2" dump badging parkfuchs.apk \
             | grep -E "^(package|sdkVersion|targetSdkVersion|application-label:)"
           echo "--- Signatur"
-          "$WERKZEUG/apksigner" verify --verbose parkfuchs.apk
+          "$WERKZEUG/apksigner" verify --verbose --print-certs parkfuchs.apk \
+            | grep -E "Verifies|scheme|Signer #1 certificate (DN|SHA-256)"
+          echo "--- Nicht mehr auf Fehlersuche gebaut"
+          "$WERKZEUG/aapt2" dump badging parkfuchs.apk | grep -q "application-debuggable" \
+            && { echo "FEHLER: Paket ist als debuggable gebaut"; exit 1; } \
+            || echo "ok, kein Debug-Paket"
           echo "--- Groesse und Pruefsumme"
-          ls -l parkfuchs.apk | awk '{print $5 " Bytes"}'
+          stat -c%s parkfuchs.apk
           sha256sum parkfuchs.apk | tee pruefsumme.txt
 
       - name: Zum Herunterladen bereitstellen
@@ -73,15 +106,18 @@ jobs:
         run: |
           SUMME=$(cut -d' ' -f1 pruefsumme.txt)
           GROESSE=$(stat -c%s parkfuchs.apk)
-          TEXT="Automatisch gebaut und geprueft (Signatur, Mindestversion, Vollstaendigkeit).
+          TEXT="Fassung 1.0.${{ github.run_number }} - automatisch gebaut und geprueft.
 
           Groesse: $GROESSE Bytes
           SHA-256: $SUMME
 
-          Debug-signiert: zum Selbstinstallieren gedacht, nicht fuer den Play Store.
-          Auf dem Handy muss die Installation aus unbekannten Quellen erlaubt sein.
+          Fest signiert: neue Fassungen lassen sich ueber eine bereits installierte legen,
+          ohne vorher zu deinstallieren. Auf dem Handy muss die Installation aus
+          unbekannten Quellen erlaubt sein; bei neueren Samsung-Geraeten zusaetzlich die
+          'Automatische Blockierung' unter Sicherheit ausschalten.
+
           Bei 'Problem beim Parsen des Pakets' ist fast immer der Download unvollstaendig -
-          Dateigroesse vergleichen und ueber WLAN erneut laden."
+          Dateigroesse mit der Angabe oben vergleichen und ueber WLAN erneut laden."
           gh release create apk --title "Parkfuchs - aktueller Stand" --notes "$TEXT" \
             || gh release edit apk --title "Parkfuchs - aktueller Stand" --notes "$TEXT"
           gh release upload apk parkfuchs.apk --clobber
