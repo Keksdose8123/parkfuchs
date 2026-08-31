@@ -1,0 +1,10 @@
+node_modules/
+android/
+www/
+*.apk
+package.json
+package-lock.json
+capacitor.config.*
+_vorschau.png
+_logo_ansicht.png
+__pycache__/

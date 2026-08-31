@@ -1,0 +1,71 @@
+name: APK bauen
+
+# Der GitHub-Runner bringt Java und das Android-SDK schon mit. Damit muss lokal
+# nichts installiert werden - das fertige APK haengt danach unter "Releases".
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Web-Dateien einsammeln
+        run: |
+          mkdir -p www
+          cp index.html park.js navi.js manifest.json favicon.png icon-*.png www/
+          ls -1 www/
+
+      - name: Android-Projekt erzeugen
+        run: |
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init Parkfuchs de.parkfuchs.app --web-dir www
+          npx cap add android
+          npx cap sync android
+
+      - name: Startsymbole setzen
+        run: npx @capacitor/assets generate --android --assetPath assets
+
+      - name: APK bauen
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Zum Herunterladen bereitstellen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mv android/app/build/outputs/apk/debug/app-debug.apk parkfuchs.apk
+          gh release create apk \
+            --title "Parkfuchs - aktueller Stand" \
+            --notes "Automatisch gebaut. Debug-signiert: zum Selbstinstallieren gedacht, nicht fuer den Play Store. Auf dem Handy muss die Installation aus unbekannten Quellen erlaubt sein." \
+            || echo "Freigabe besteht bereits, es wird nur die Datei ersetzt"
+          gh release upload apk parkfuchs.apk --clobber
+
+      - name: APK auch als Artefakt sichern
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parkfuchs-apk
+          path: parkfuchs.apk
+          if-no-files-found: ignore
