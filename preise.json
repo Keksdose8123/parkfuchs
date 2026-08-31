@@ -1,0 +1,26 @@
+{
+  "stand": "2026-08-31",
+  "hinweis": "Von Hand geprüfte Tarife als Startbestand. Jeder Eintrag nennt Quelle, wörtlichen Beleg und Prüfdatum. Wo nichts steht, zeigt die App ehrlich 'Preis nicht hinterlegt' statt einer Schätzung.",
+  "eintraege": [
+    {
+      "name": "Salvatorgarage",
+      "lat": 48.14186,
+      "lon": 11.57412,
+      "umkreis": 300,
+      "tarif": { "proStunde": 4.0, "tagessatz": 40.0, "waehrung": "EUR" },
+      "quelle": "https://bavaria-parkgaragen.de/facility/salvatorplatz-altstadt/",
+      "beleg": "4,00 € pro angefangener Stunde; Tagessatz 40,00 €; Dauerparken 357,00 € pro Monat",
+      "geprueft": "2026-08-31"
+    },
+    {
+      "name": "Operngarage",
+      "lat": 48.14018,
+      "lon": 11.57776,
+      "umkreis": 300,
+      "tarif": { "proStunde": 4.0, "tagessatz": 32.0, "waehrung": "EUR" },
+      "quelle": "https://www.operngarage.de/files/operngarage.de/docs/2022-08-08_Zeiten%20und%20Preise.pdf",
+      "beleg": "Pro angefangener Parkstunde 4,00 €; Tagessatz (8-24 Stunden) 32,00 €; Nachtpauschale 18:00-09:00 Uhr 13,00 € — Preisblatt vom 08.08.2022, kann veraltet sein",
+      "geprueft": "2026-08-31"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 // Selbstpruefung der Merkmals-Auswertung.  Aufruf:  node test.js
 const assert = require('assert');
-const { distanz, zahl, dauer, preisText, zeitenText, begriff, wertText, merkmale, aufbereiten, filtern } = require('./park.js');
+const { distanz, zahl, dauer, preisText, zeitenText, begriff, wertText,
+        kosten, euro, preiseAnhaengen, merkmale, aufbereiten, filtern } = require('./park.js');
 
 const knoten = (tags, lat = 50, lon = 8) => ({ type: 'node', id: 1, lat, lon, tags });
 
@@ -84,6 +85,11 @@ const liste = [
 assert.strictEqual(filtern(liste, true, false).length, 3, 'Unbekanntes darf der Kostenlos-Filter nicht schlucken');
 assert.strictEqual(filtern(liste, false, true).length, 3);
 assert.strictEqual(filtern(liste, true, true).length, 2);
+// Kundenparkplaetze getrennt aussortierbar
+const mitKunden = liste.concat([{ gebuehr: 'kostenlos', zugang: 'Kunden' }]);
+assert.strictEqual(filtern(mitKunden, false, false, false).length, 5);
+assert.strictEqual(filtern(mitKunden, false, false, true).length, 4, 'Kundenfilter greift nicht');
+assert.strictEqual(filtern(mitKunden, false, true, true).length, 3);
 
 // Deutsche Beschriftung der Rohdaten - Unbekanntes muss stehenbleiben, nicht verschwinden
 assert.strictEqual(begriff('maxheight'), 'Einfahrtshöhe');
@@ -95,6 +101,35 @@ assert.strictEqual(wertText('fee', 'yes'), 'ja');
 assert.strictEqual(wertText('charge', '2.50 EUR/hour'), '2,50 €/Std.');
 assert.strictEqual(wertText('opening_hours', '24/7'), 'durchgehend');
 assert.strictEqual(wertText('name', 'Parkhaus Mitte'), 'Parkhaus Mitte');
+
+// --- Tarife: der Tagesdeckel muss den Stundensatz schlagen, sobald er guenstiger ist
+const tarif = { proStunde: 4, tagessatz: 40 };
+assert.strictEqual(kosten(tarif, 60), 4);
+assert.strictEqual(kosten(tarif, 61), 8, 'angefangene Stunde wird voll berechnet');
+assert.strictEqual(kosten(tarif, 180), 12);
+assert.strictEqual(kosten(tarif, 600), 40, 'Tagesdeckel greift nicht');
+assert.strictEqual(kosten(tarif, 1500), 80, 'zweiter Tag fehlt');
+assert.strictEqual(kosten({ tagessatz: 12 }, 120), 12, 'nur Tagessatz muss reichen');
+assert.strictEqual(kosten(null, 60), null);
+assert.strictEqual(kosten({}, 60), null, 'leerer Tarif ist kein Preis von 0');
+assert.strictEqual(euro(2.5), '2,50 €');
+assert.strictEqual(euro(null), null);
+
+// Zuordnung: gleicher Name in einer anderen Stadt darf den Preis nicht erben
+const treffer2 = [
+  { id: 'way/1', name: 'Parkhaus Mitte', lat: 51.31, lon: 9.48 },
+  { id: 'way/2', name: 'Parkhaus Mitte', lat: 48.14, lon: 11.57 },
+];
+const tabelle = { eintraege: [
+  { name: 'Parkhaus Mitte', lat: 51.3101, lon: 9.4801, tarif: { proStunde: 2 }, quelle: 'https://x' },
+] };
+const angereichert = preiseAnhaengen(treffer2, tabelle);
+assert.ok(angereichert[0].tarif, 'naher Treffer bekam keinen Tarif');
+assert.strictEqual(angereichert[1].tarif, undefined, 'ferner Namensgleicher hat den Tarif geerbt');
+assert.strictEqual(angereichert[0].tarifQuelle, 'https://x');
+// Kennung schlaegt Namensvergleich
+assert.ok(preiseAnhaengen([{ id: 'way/9', name: 'Anders', lat: 0, lon: 0 }],
+  { eintraege: [{ id: 'way/9', tarif: { proStunde: 1 } }] })[0].tarif);
 
 /* ---------- Routenfuehrung ------------------------------------------------- */
 const N = require('./navi.js');

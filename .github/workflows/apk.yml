@@ -35,16 +35,19 @@ jobs:
       - name: Web-Dateien einsammeln
         run: |
           mkdir -p www
-          cp index.html park.js navi.js manifest.json favicon.png icon-*.png www/
+          cp index.html park.js navi.js manifest.json preise.json favicon.png icon-*.png www/
           ls -1 www/
 
       - name: Android-Projekt erzeugen
         run: |
           npm init -y >/dev/null
-          npm install --no-audit --no-fund @capacitor/core @capacitor/cli @capacitor/android
+          npm install --no-audit --no-fund @capacitor/core @capacitor/cli @capacitor/android @capacitor-community/speech-recognition
           npx cap init Parkfuchs de.parkfuchs.app --web-dir www
           npx cap add android
           npx cap sync android
+
+      - name: Berechtigungen anmelden
+        run: python3 bau/berechtigungen.py
 
       - name: Versionsnummer hochzaehlen
         run: |
@@ -75,10 +78,7 @@ jobs:
           echo "$SCHLUESSEL" | base64 -d > schluessel.p12
           UNSIGNIERT=$(ls android/app/build/outputs/apk/release/*.apk | head -n1)
           "$WERKZEUG/zipalign" -p -f 4 "$UNSIGNIERT" ausgerichtet.apk
-          "$WERKZEUG/apksigner" sign \
-            --ks schluessel.p12 --ks-type PKCS12 --ks-key-alias parkfuchs \
-            --ks-pass env:KSPW --key-pass env:KSPW \
-            --out parkfuchs.apk ausgerichtet.apk
+          "$WERKZEUG/apksigner" sign --ks schluessel.p12 --ks-type PKCS12 --ks-key-alias parkfuchs --ks-pass env:KSPW --key-pass env:KSPW --out parkfuchs.apk ausgerichtet.apk
           rm -f schluessel.p12 ausgerichtet.apk
 
       # Das fertige Paket selbst pruefen, statt darauf zu vertrauen, dass der Bau
@@ -87,15 +87,19 @@ jobs:
         run: |
           WERKZEUG=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n1)
           echo "--- Eckdaten"
-          "$WERKZEUG/aapt2" dump badging parkfuchs.apk \
-            | grep -E "^(package|sdkVersion|targetSdkVersion|application-label:)"
+          "$WERKZEUG/aapt2" dump badging parkfuchs.apk | grep -E "^(package|sdkVersion|targetSdkVersion|application-label:)"
           echo "--- Signatur"
-          "$WERKZEUG/apksigner" verify --verbose --print-certs parkfuchs.apk \
-            | grep -E "Verifies|scheme|Signer #1 certificate (DN|SHA-256)"
-          echo "--- Nicht mehr auf Fehlersuche gebaut"
-          "$WERKZEUG/aapt2" dump badging parkfuchs.apk | grep -q "application-debuggable" \
-            && { echo "FEHLER: Paket ist als debuggable gebaut"; exit 1; } \
-            || echo "ok, kein Debug-Paket"
+          "$WERKZEUG/apksigner" verify --verbose --print-certs parkfuchs.apk | grep -E "Verifies|scheme|Signer #1 certificate (DN|SHA-256)"
+          echo "--- Berechtigungen"
+          "$WERKZEUG/aapt2" dump badging parkfuchs.apk | grep "uses-permission" || true
+          for RECHT in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION RECORD_AUDIO; do
+            "$WERKZEUG/aapt2" dump badging parkfuchs.apk | grep -q "android.permission.$RECHT" || { echo "FEHLER: Berechtigung $RECHT fehlt - Standort bzw. Diktat wuerden stumm scheitern"; exit 1; }
+          done
+          echo "--- Nicht auf Fehlersuche gebaut"
+          if "$WERKZEUG/aapt2" dump badging parkfuchs.apk | grep -q "application-debuggable"; then
+            echo "FEHLER: Paket ist als debuggable gebaut"; exit 1
+          fi
+          echo "ok, kein Debug-Paket"
           echo "--- Groesse und Pruefsumme"
           stat -c%s parkfuchs.apk
           sha256sum parkfuchs.apk | tee pruefsumme.txt
@@ -118,8 +122,7 @@ jobs:
 
           Bei 'Problem beim Parsen des Pakets' ist fast immer der Download unvollstaendig -
           Dateigroesse mit der Angabe oben vergleichen und ueber WLAN erneut laden."
-          gh release create apk --title "Parkfuchs - aktueller Stand" --notes "$TEXT" \
-            || gh release edit apk --title "Parkfuchs - aktueller Stand" --notes "$TEXT"
+          gh release create apk --title "Parkfuchs - aktueller Stand" --notes "$TEXT" || gh release edit apk --title "Parkfuchs - aktueller Stand" --notes "$TEXT"
           gh release upload apk parkfuchs.apk --clobber
 
       - name: APK auch als Artefakt sichern

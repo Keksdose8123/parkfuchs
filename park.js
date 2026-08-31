@@ -174,6 +174,53 @@ function merkmale(el) {
   };
 }
 
+
+// --- Tarife und Kosten ------------------------------------------------------
+// "Guenstigste" gibt es nicht ohne Parkdauer: 4 EUR/Std. schlaegt 40 EUR Tagessatz
+// bei zwei Stunden, bei zwoelf ist es umgekehrt. Darum immer mit Minuten rechnen.
+// ponytail: nur Stundensatz und Tagesdeckel. Gestaffelte Tarife ("erste Stunde
+// 1 EUR, danach 2") kaemen als tarif.staffel dazu, wenn sie in den Daten auftauchen.
+function kosten(tarif, minuten) {
+  if (!tarif || minuten == null) return null;
+  let summe = null;
+  if (tarif.proStunde != null) summe = Math.ceil(minuten / 60) * tarif.proStunde;
+  if (tarif.tagessatz != null) {
+    const tage = Math.max(1, Math.ceil(minuten / 1440));
+    const gedeckelt = tage * tarif.tagessatz;
+    summe = summe == null ? gedeckelt : Math.min(summe, gedeckelt);
+  }
+  return summe == null ? null : Math.round(summe * 100) / 100;
+}
+
+function euro(betrag) {
+  if (betrag == null) return null;
+  return betrag.toFixed(2).replace('.', ',') + ' €';
+}
+
+const namensform = s => String(s || '').toLowerCase().replace(/[^a-z0-9äöüß]/g, '');
+
+// Tarife an die Treffer haengen: ueber die OSM-Kennung, sonst ueber Name und Naehe.
+// Ohne Naehepruefung wuerde "Parkhaus Mitte" in jeder Stadt denselben Preis erben.
+function preiseAnhaengen(liste, tabelle) {
+  const eintraege = (tabelle && tabelle.eintraege) || [];
+  if (!eintraege.length) return liste;
+  return liste.map(function (p) {
+    const passt = eintraege.find(function (e) {
+      if (e.id) return e.id === p.id;
+      if (!e.name || !p.name) return false;
+      if (namensform(e.name) !== namensform(p.name)) return false;
+      if (e.lat == null || e.lon == null) return true;
+      return distanz(e.lat, e.lon, p.lat, p.lon) < (e.umkreis || 500);
+    });
+    if (!passt) return p;
+    const angereichert = Object.assign({}, p, { tarif: passt.tarif });
+    angereichert.tarifQuelle = passt.quelle || null;
+    angereichert.tarifBeleg = passt.beleg || null;
+    angereichert.tarifStand = passt.geprueft || null;
+    return angereichert;
+  });
+}
+
 // Merkmale + Entfernung zum Ziel, nach Naehe sortiert. Privates fliegt raus (nicht nutzbar).
 function aufbereiten(elemente, zielLat, zielLon) {
   const alle = elemente
@@ -187,12 +234,14 @@ function aufbereiten(elemente, zielLat, zielLon) {
   };
 }
 
-function filtern(treffer, nurKostenlos, ohneAnwohner) {
+function filtern(treffer, nurKostenlos, ohneAnwohner, ohneKunden) {
   return treffer.filter(p =>
     (!nurKostenlos || p.gebuehr !== 'gebuehrenpflichtig') &&
-    (!ohneAnwohner || p.zugang !== 'Anwohner'));
+    (!ohneAnwohner || p.zugang !== 'Anwohner') &&
+    (!ohneKunden || p.zugang !== 'Kunden'));
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { distanz, zahl, dauer, preisText, zeitenText, begriff, wertText, merkmale, aufbereiten, filtern, art, gebuehr, zugang };
+  module.exports = { distanz, zahl, dauer, preisText, zeitenText, begriff, wertText,
+                   kosten, euro, preiseAnhaengen, merkmale, aufbereiten, filtern, art, gebuehr, zugang };
 }

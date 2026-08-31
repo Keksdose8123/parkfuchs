@@ -49,8 +49,10 @@ kopf, .kopf-zeile{display:flex}
 .kopf-zeile{align-items:center;gap:10px;margin:2px 0 16px}
 .kopf-zeile img{width:32px;height:32px;border-radius:8px;flex:none}
 .wortmarke{
-  font:700 21px/1 var(--schmal); letter-spacing:.13em; text-transform:uppercase; margin:0;
+  font:700 21px/1 var(--schmal); letter-spacing:.13em; text-transform:uppercase; margin:0; flex:1;
 }
+.ton{padding:9px 11px;font-size:15px;line-height:1;border-radius:10px;flex:none}
+.ton[aria-pressed="false"]{background:transparent;color:var(--leise);border-color:var(--linie)}
 
 /* ---------- Eingabe ---------- */
 form{display:flex;gap:8px}
@@ -81,14 +83,29 @@ button{
 #status b{color:var(--text);font-weight:700}
 #status.fehler{color:var(--warn)}
 
-#schalter{display:none;gap:7px;margin:0 0 14px}
+#schalter{display:none;flex-wrap:wrap;gap:7px;margin:0 0 14px}
 #schalter.an{display:flex}
 .schalter{
-  flex:1;padding:9px 4px;background:var(--flaeche);color:var(--leise);
+  flex:1 1 30%;min-width:96px;padding:9px 4px;background:var(--flaeche);color:var(--leise);
   border:1px solid var(--linie);border-radius:9px;cursor:pointer;white-space:nowrap;
   font:600 12px/1.2 var(--schrift); letter-spacing:.04em; text-transform:uppercase;
 }
 .schalter[aria-pressed="true"]{background:var(--marke);color:var(--auf-marke);border-color:transparent}
+
+#dauer{display:none;align-items:center;gap:7px;margin:0 0 14px}
+#dauer.an{display:flex}
+#dauer .titel{font:600 11.5px/1.2 var(--schrift);letter-spacing:.05em;text-transform:uppercase;
+  color:var(--leise);white-space:nowrap}
+
+#stimmzeile{display:none;align-items:center;gap:8px;margin:22px 0 0;
+  padding-top:16px;border-top:1px solid var(--linie)}
+#stimmzeile.an{display:flex}
+#stimmzeile .titel{font:600 11.5px/1.2 var(--schrift);letter-spacing:.05em;
+  text-transform:uppercase;color:var(--leise);white-space:nowrap}
+#stimmenwahl{flex:1;min-width:0;padding:9px 10px;border-radius:9px;border:1px solid var(--linie);
+  background:var(--flaeche);color:var(--text);font:500 14px/1.2 var(--schrift)}
+#stimmProbe{flex:none;padding:9px 12px;font-size:13px}
+.beleg{padding:0 14px 10px 19px;font:400 12.5px/1.5 var(--schrift);color:var(--leise)}
 
 /* ---------- Karte ---------- */
 #landkarte{
@@ -96,6 +113,23 @@ button{
   margin-bottom:14px;overflow:hidden;z-index:0;box-shadow:var(--schatten);
 }
 .leaflet-popup-content{margin:9px 11px;font:500 13px/1.4 var(--schrift)}
+.leaflet-tooltip{background:var(--flaeche);color:var(--text);border:1px solid var(--linie);
+  border-radius:8px;box-shadow:var(--schatten);font:600 12.5px/1.2 var(--schrift);padding:6px 9px}
+.leaflet-tooltip::before{display:none}
+
+/* Vorschlaege waehrend des Tippens */
+#vorschlaege{margin:8px 0 0;border:1px solid var(--linie);border-radius:11px;
+  background:var(--flaeche);box-shadow:var(--schatten);overflow:hidden;gap:0}
+#vorschlaege li{border:0;border-radius:0;box-shadow:none;background:transparent;transform:none}
+#vorschlaege li::before{display:none}
+#vorschlaege li + li{border-top:1px solid var(--linie)}
+#vorschlaege button{width:100%;text-align:left;background:transparent;color:var(--text);
+  border:0;border-radius:0;padding:11px 14px;font:500 15px/1.35 var(--schrift)}
+#vorschlaege .ort{display:block;font:400 12.5px/1.35 var(--schrift);color:var(--leise);margin-top:2px}
+
+/* Sichtbar, dass gerade zugehoert wird */
+.mikro[aria-pressed="true"]{background:var(--warn);animation:pulsen 1.1s ease-in-out infinite}
+@keyframes pulsen{0%,100%{opacity:1}50%{opacity:.5}}
 
 /* ---------- Buchten ---------- */
 ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
@@ -188,14 +222,18 @@ li.neu{animation:einfahren .32s cubic-bezier(.2,.7,.3,1) backwards}
 <div class="kopf-zeile">
   <img src="icon-192.png" alt="">
   <h1 class="wortmarke">Parkfuchs</h1>
+  <button class="ton" id="fAnsage" type="button" aria-pressed="true"
+          title="Ansagen an oder aus" aria-label="Ansagen an oder aus">&#128266;</button>
 </div>
 
 <form id="formular">
   <input id="eingabe" type="search" enterkeyhint="search" autocomplete="off"
          placeholder="Zieladresse oder Ort">
-  <button class="mikro" id="mikro" type="button" title="Ziel diktieren" aria-label="Ziel diktieren">&#127908;</button>
+  <button class="mikro" id="mikro" type="button" aria-pressed="false"
+          title="Ziel diktieren" aria-label="Ziel diktieren">&#127908;</button>
   <button type="submit">Suchen</button>
 </form>
+<ul id="vorschlaege" hidden></ul>
 <button class="zweit" id="hier" type="button">Ich bin schon da &mdash; hier suchen</button>
 
 <p id="status"></p>
@@ -203,12 +241,25 @@ li.neu{animation:einfahren .32s cubic-bezier(.2,.7,.3,1) backwards}
 <div id="schalter">
   <button class="schalter" id="fKostenlos" aria-pressed="false" type="button">kostenlos</button>
   <button class="schalter" id="fAnwohner" aria-pressed="false" type="button">ohne Anwohner</button>
-  <button class="schalter" id="fAnsage" aria-pressed="true" type="button">Ansage</button>
+  <button class="schalter" id="fKunden" aria-pressed="false" type="button">ohne Kunden</button>
+</div>
+
+<div id="dauer">
+  <span class="titel">Günstigste für</span>
+  <button class="schalter" type="button" data-min="60" aria-pressed="false">1 Std</button>
+  <button class="schalter" type="button" data-min="180" aria-pressed="false">3 Std</button>
+  <button class="schalter" type="button" data-min="1440" aria-pressed="false">Tag</button>
 </div>
 
 <div id="landkarte" hidden></div>
 <ul id="liste"></ul>
 <button class="zweit" id="weiter" type="button" hidden>Umkreis verdoppeln</button>
+
+<div id="stimmzeile">
+  <label class="titel" for="stimmenwahl">Stimme</label>
+  <select id="stimmenwahl"></select>
+  <button class="schalter" id="stimmProbe" type="button">Probe</button>
+</div>
 
 <footer>
   Daten: OpenStreetMap, Route von OSRM. Entfernung ist Luftlinie zum Ziel.<br>
@@ -234,7 +285,15 @@ let radius = 1000, ziel = null, treffer = [], privatAus = 0, angezeigt = [];
 // Die Standortabfrage laeuft bis zu 10 s. Tippt man derweil ein Ziel ein, darf ihre
 // spaete Antwort das Ergebnis nicht mehr ueberschreiben.
 let suchNr = 0;
-let landkarte = null, ebene = null, marker = [], gewaehlt = -1;
+let landkarte = null, ebene = null, marker = [], gewaehlt = -1, ring = null;
+// Preise liegen als Datei neben der App - vom eigenen Server, darum ohne Browsersperre.
+let preistabelle = null, dauerMinuten = 0;
+fetch('preise.json')
+  .then(function (r) { return r.ok ? r.json() : null; })
+  .then(function (d) { preistabelle = d; if (treffer.length) zeichnen(false); })
+  .catch(function () { /* ohne Preistabelle laeuft alles wie zuvor */ });
+
+const DAUER_TEXT = { 60: '1 Std', 180: '3 Std', 1440: 'Tag' };
 
 function zeigen(html, fehler) {
   $('status').innerHTML = html;
@@ -265,19 +324,68 @@ function stimmeFreischalten() {
 // Ohne ausdrückliche Wahl nimmt der Browser irgendeine deutsche Stimme — oft die
 // blecherne Standardstimme. Die Bewertung bevorzugt die hochwertigen Ansagestimmen.
 let stimme = null;
-function stimmeWaehlen() {
-  if (!window.speechSynthesis) return;
-  const deutsch = speechSynthesis.getVoices()
-    .filter(v => (v.lang || '').toLowerCase().indexOf('de') === 0);
-  if (!deutsch.length) return;
-  const punkte = v => (/neural|premium|enhanced|siri/i.test(v.name) ? 4 : 0)
-                    + (/google/i.test(v.name) ? 3 : 0)
-                    + (/helena|anna|petra|katja|markus|conrad|vicki/i.test(v.name) ? 2 : 0)
-                    + ((v.lang || '').toLowerCase() === 'de-de' ? 1 : 0);
-  stimme = deutsch.slice().sort((a, b) => punkte(b) - punkte(a))[0];
+
+const gemerkt = function (schluessel, wert) {
+  try {
+    if (wert === undefined) return localStorage.getItem(schluessel);
+    localStorage.setItem(schluessel, wert);
+  } catch (e) { return null; }   // privates Fenster, gesperrter Speicher
+};
+
+function deutscheStimmen() {
+  if (!window.speechSynthesis) return [];
+  return speechSynthesis.getVoices().filter(v => (v.lang || '').toLowerCase().indexOf('de') === 0);
 }
+
+// Die Vorauswahl bevorzugt die aufwendigen Ansagestimmen. Sie bleibt eine Vermutung -
+// deshalb kann darunter jede vorhandene Stimme von Hand gewaehlt werden.
+function stimmeWaehlen() {
+  const deutsch = deutscheStimmen();
+  if (!deutsch.length) return;
+  const eigene = gemerkt('stimme');
+  const gefunden = eigene && deutsch.find(v => v.name === eigene);
+  if (gefunden) { stimme = gefunden; }
+  else {
+    const punkte = v => (/neural|premium|enhanced|siri/i.test(v.name) ? 4 : 0)
+                      + (/google/i.test(v.name) ? 3 : 0)
+                      + (/helena|anna|petra|katja|markus|conrad|vicki/i.test(v.name) ? 2 : 0)
+                      + ((v.lang || '').toLowerCase() === 'de-de' ? 1 : 0);
+    stimme = deutsch.slice().sort((a, b) => punkte(b) - punkte(a))[0];
+  }
+  stimmenListeFuellen(deutsch);
+}
+
+function stimmenListeFuellen(deutsch) {
+  if (deutsch.length < 2) return;                 // ohne Auswahl keine Auswahlliste
+  $('stimmenwahl').innerHTML = deutsch.map(function (v) {
+    return '<option value="' + sicher(v.name) + '">' + sicher(v.name) + '</option>';
+  }).join('');
+  if (stimme) $('stimmenwahl').value = stimme.name;
+  $('stimmzeile').classList.add('an');
+}
+
 stimmeWaehlen();
 if (window.speechSynthesis) speechSynthesis.onvoiceschanged = stimmeWaehlen;
+
+$('stimmenwahl').onchange = function () {
+  stimme = deutscheStimmen().find(v => v.name === $('stimmenwahl').value) || stimme;
+  gemerkt('stimme', $('stimmenwahl').value);
+  probeSprechen();
+};
+$('stimmProbe').onclick = probeSprechen;
+
+// Die Probe spricht auch, wenn die Ansagen aus sind - sonst waere sie stumm.
+function probeSprechen() {
+  if (!window.speechSynthesis) return;
+  stimmeFreischalten();
+  const sprich = new SpeechSynthesisUtterance(
+    'In 300 Metern rechts abbiegen, auf die Bahnhofstraße. Danach ist dein Ziel erreicht.');
+  sprich.lang = 'de-DE';
+  if (stimme) sprich.voice = stimme;
+  sprich.rate = 0.96;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(sprich);
+}
 
 function ansagen(text) {
   if (!an('fAnsage') || !window.speechSynthesis) return;
@@ -299,23 +407,72 @@ function fundAnsage(p) {
   return 'Nächste Möglichkeit: ' + teile.join(', ') + '.';
 }
 
-const Erkennung = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (!Erkennung) $('mikro').hidden = true;
+// Im Browser gibt es die Web-Spracherkennung. In der Android-App (WebView) gibt es sie
+// nicht - dort springt das native Modul ein, sofern es eingebaut ist.
+const WebErkennung = window.SpeechRecognition || window.webkitSpeechRecognition;
+const nativesDiktat = () => (window.Capacitor && window.Capacitor.Plugins
+  && window.Capacitor.Plugins.SpeechRecognition) || null;
+if (!WebErkennung && !nativesDiktat()) $('mikro').hidden = true;
 
-$('mikro').onclick = function () {
+const SPRACH_FEHLER = {
+  'not-allowed': 'Zugriff aufs Mikrofon ist gesperrt. In den Berechtigungen erlauben.',
+  'service-not-allowed': 'Die Spracherkennung ist auf diesem Gerät gesperrt.',
+  'no-speech': 'Nichts gehört. Nochmal antippen und dann sprechen.',
+  'audio-capture': 'Kein Mikrofon gefunden.',
+  'network': 'Die Spracherkennung braucht Internet und ist gerade nicht erreichbar.',
+  'aborted': 'Abgebrochen.',
+};
+
+const hoert = zu => $('mikro').setAttribute('aria-pressed', zu ? 'true' : 'false');
+
+function zielGesprochen(text) {
+  if (!text) return zeigen(SPRACH_FEHLER['no-speech'], true);
+  $('eingabe').value = text;
+  $('formular').requestSubmit();
+}
+
+async function diktieren() {
   stimmeFreischalten();
-  const hoerer = new Erkennung();
+  const nativ = nativesDiktat();
+  hoert(true);
+  if (nativ) {
+    try {
+      const erlaubnis = await nativ.requestPermissions();
+      if (erlaubnis && erlaubnis.speechRecognition === 'denied') {
+        hoert(false); return zeigen(SPRACH_FEHLER['not-allowed'], true);
+      }
+      zeigen('Sprich dein Ziel …');
+      const ergebnis = await nativ.start(
+        { language: 'de-DE', maxResults: 1, partialResults: false, popup: false });
+      hoert(false);
+      zielGesprochen(ergebnis && ergebnis.matches && ergebnis.matches[0]);
+    } catch (e) {
+      hoert(false);
+      zeigen('Spracherkennung fehlgeschlagen: ' + sicher((e && e.message) || e), true);
+    }
+    return;
+  }
+  if (!WebErkennung) { hoert(false); return zeigen('Dieses Gerät kann keine Spracheingabe.', true); }
+  const hoerer = new WebErkennung();
   hoerer.lang = 'de-DE';
   hoerer.interimResults = false;
   hoerer.maxAlternatives = 1;
+  let verstanden = false, gemeldet = false;
   zeigen('Sprich dein Ziel …');
-  hoerer.onresult = function (ev) {
-    $('eingabe').value = ev.results[0][0].transcript;
-    $('formular').requestSubmit();
+  hoerer.onresult = function (ev) { verstanden = true; zielGesprochen(ev.results[0][0].transcript); };
+  hoerer.onerror = function (ev) {
+    gemeldet = true;
+    zeigen(SPRACH_FEHLER[ev.error] || ('Spracherkennung fehlgeschlagen (' + sicher(ev.error) + ').'), true);
   };
-  hoerer.onerror = function () { zeigen('Nichts verstanden — bitte nochmal oder eintippen.', true); };
-  hoerer.start();
-};
+  // Ohne onend bleibt "Sprich dein Ziel ..." stehen, wenn gar nichts kam.
+  hoerer.onend = function () {
+    hoert(false);
+    if (!verstanden && !gemeldet) zeigen(SPRACH_FEHLER['no-speech'], true);
+  };
+  try { hoerer.start(); }
+  catch (e) { hoert(false); zeigen('Spracheingabe konnte nicht starten.', true); }
+}
+$('mikro').onclick = diktieren;
 
 /* ---------- Daten --------------------------------------------------------- */
 
@@ -376,13 +533,20 @@ function weiteHtml(m) {
 
 function eintrag(p, nr) {
   const teile = [];
+  const stundensatz = p.tarif && p.tarif.proStunde != null ? p.tarif.proStunde : null;
+  const gerechnet = dauerMinuten ? kosten(p.tarif, dauerMinuten) : null;
   if (p.gebuehr === 'kostenlos') {
     teile.push('<span class="frei">kostenlos</span>');
   } else if (p.gebuehr === 'gebuehrenpflichtig') {
-    // Preis steht in OSM selten drin. Wenn doch, ist er die wichtigste Angabe der Bucht.
-    teile.push(p.preis
-      ? '<span class="geld">' + sicher(p.preis) + '</span>'
-      : '<span class="geld">kostenpflichtig</span> <span class="offen">Preis nicht hinterlegt</span>');
+    // Reihenfolge nach Verlaesslichkeit: gerechneter Tarif, Stundensatz, OSM-Angabe, nichts.
+    if (gerechnet != null)
+      teile.push('<span class="geld">' + DAUER_TEXT[dauerMinuten] + ' ' + euro(gerechnet) + '</span>');
+    else if (stundensatz != null)
+      teile.push('<span class="geld">' + euro(stundensatz) + '/Std.</span>');
+    else if (p.preis)
+      teile.push('<span class="geld">' + sicher(p.preis) + '</span>');
+    else
+      teile.push('<span class="geld">kostenpflichtig</span> <span class="offen">Preis nicht hinterlegt</span>');
   } else {
     teile.push('<span class="offen">Gebühr nicht hinterlegt</span>');
   }
@@ -411,6 +575,10 @@ function eintrag(p, nr) {
     + '<div class="aktion"><button type="button" data-los="' + nr + '">Losfahren</button></div>'
     + '<details><summary>alle Angaben (' + schluessel.length + ')</summary>'
     + '<div class="tags">' + rohdaten + '</div>'
+    + (p.tarifBeleg ? '<div class="beleg">Tarif: ' + sicher(p.tarifBeleg)
+        + (p.tarifStand ? ' · geprüft ' + sicher(p.tarifStand) : '') + '</div>' : '')
+    + (p.tarifQuelle ? '<a class="raus" href="' + sicher(p.tarifQuelle)
+        + '" target="_blank" rel="noopener">Tarif nachlesen</a> ' : '')
     + '<a class="raus" href="' + naviLink(p) + '" target="_blank" rel="noopener">in Google Maps öffnen</a> '
     + (p.web ? '<a class="raus" href="' + sicher(p.web) + '" target="_blank" rel="noopener">Website des Betreibers</a> ' : '')
     + '<a class="raus" href="https://www.openstreetmap.org/' + p.id + '" target="_blank" rel="noopener">bei OpenStreetMap nachtragen</a>'
@@ -431,6 +599,7 @@ function kartenZeichnen(liste) {
   $('landkarte').hidden = false;
   if (!kartenAufbauen()) { $('landkarte').hidden = true; return; }
   if (ebene) ebene.remove();
+  ringSetzen(-1);
   ebene = L.layerGroup().addTo(landkarte);
   marker = [];
 
@@ -440,16 +609,25 @@ function kartenZeichnen(liste) {
 
   liste.forEach(function (p, nr) {
     punkte.push([p.lat, p.lon]);
+    // Keine Sprechblase: die Bucht unten ist die Detailflaeche, zwei waeren eine zuviel.
     const m = L.circleMarker([p.lat, p.lon], { radius: 8, color: '#fff', weight: 2,
       fillColor: punktVonKosten(p), fillOpacity: 1 }).addTo(ebene);
-    m.bindTooltip((p.name ? p.name : p.art) + ' · ' + p.meter + ' m');
-    // Antippen zeigt den Eintrag unten - eine Detailflaeche, nicht zwei.
     m.on('click', function () { auswaehlen(nr, true); });
     marker.push(m);
   });
 
   landkarte.fitBounds(L.latLngBounds(punkte).pad(0.15));
   setTimeout(function () { landkarte.invalidateSize(); }, 60);
+}
+
+// Ein offener Ring um die gewaehlte Markierung - deutlicher als nur ein groesserer Punkt.
+function ringSetzen(nr) {
+  if (ring) { ring.remove(); ring = null; }
+  if (nr < 0 || !landkarte || !marker[nr] || !angezeigt[nr]) return;
+  ring = L.circleMarker(marker[nr].getLatLng(), {
+    radius: 17, weight: 2.5, color: punktVonKosten(angezeigt[nr]),
+    opacity: .9, fill: false, interactive: false,
+  }).addTo(landkarte);
 }
 
 // Verbindet Karte und Liste: eine Bucht ist gewaehlt, ihre Markierung waechst mit.
@@ -459,11 +637,12 @@ function auswaehlen(nr, hinscrollen) {
     if (alt) alt.classList.remove('gewaehlt');
     if (marker[gewaehlt]) marker[gewaehlt].setStyle({ radius: 8, weight: 2 });
   }
-  if (gewaehlt === nr) { gewaehlt = -1; return; }    // nochmal antippen hebt die Wahl auf
+  if (gewaehlt === nr) { gewaehlt = -1; ringSetzen(-1); return; }   // nochmal antippen hebt die Wahl auf
   gewaehlt = nr;
   const el = $('bucht' + nr);
   if (el) el.classList.add('gewaehlt');
   if (marker[nr]) marker[nr].setStyle({ radius: 12, weight: 4 }).bringToFront();
+  ringSetzen(nr);
   // Leaflet holt sich beim Antippen den Tastaturfokus; der Browser scrollt daraufhin die
   // Karte zurueck ins Bild. Darum erst danach springen, sonst verpufft der Sprung.
   if (hinscrollen && el)
@@ -472,9 +651,28 @@ function auswaehlen(nr, hinscrollen) {
     setTimeout(function () { el.scrollIntoView({ block: 'center', behavior: 'auto' }); }, 60);
 }
 
+// Kostenlos zaehlt als 0 Euro, sonst landen die Gratisplaetze hinter den teuren.
+// Unbekannte Preise ans Ende, aber nicht heraus - vielleicht ist einer davon der richtige.
+function nachPreis(liste) {
+  const preis = p => p.gebuehr === 'kostenlos' ? 0 : kosten(p.tarif, dauerMinuten);
+  return liste.slice().sort(function (a, b) {
+    const ka = preis(a), kb = preis(b);
+    if (ka == null && kb == null) return a.meter - b.meter;
+    if (ka == null) return 1;
+    if (kb == null) return -1;
+    return ka - kb || a.meter - b.meter;
+  });
+}
+
 function zeichnen(neu) {
-  const passend = filtern(treffer, an('fKostenlos'), an('fAnwohner'));
-  angezeigt = passend.slice(0, MAX);
+  const mitTarif = preiseAnhaengen(treffer, preistabelle);
+  const passend = filtern(mitTarif, an('fKostenlos'), an('fAnwohner'), an('fKunden'));
+
+  // Die Dauerzeile lohnt nur, wenn ueberhaupt ein Preis bekannt ist.
+  const bepreist = passend.filter(p => p.tarif || p.gebuehr === 'kostenlos').length;
+  $('dauer').classList.toggle('an', treffer.length > 0 && bepreist > 0);
+
+  angezeigt = (dauerMinuten ? nachPreis(passend) : passend).slice(0, MAX);
   gewaehlt = -1;
 
   $('schalter').classList.toggle('an', treffer.length > 0);
@@ -494,6 +692,7 @@ function zeichnen(neu) {
       ? '<b>' + MAX + '</b> nächste von ' + passend.length + ' um <b>' + sicher(ziel.kurz) + '</b>'
       : '<b>' + passend.length + '</b> Möglichkeit' + (passend.length === 1 ? '' : 'en')
         + ' um <b>' + sicher(ziel.kurz) + '</b>',
+    dauerMinuten ? 'nach Preis für ' + DAUER_TEXT[dauerMinuten] : '',
     treffer.length - passend.length ? (treffer.length - passend.length) + ' durch Filter aus' : '',
     privatAus ? privatAus + ' privat' : '',
   ].filter(Boolean).join(' · '));
@@ -663,11 +862,87 @@ $('liste').addEventListener('keydown', function (e) {
   if (b) { e.preventDefault(); auswaehlen(+b.dataset.nr, false); }
 });
 
+/* ---------- Vorschlaege waehrend des Tippens ------------------------------ */
+
+// Photon ist der OSM-Dienst fuer Tippvorschlaege. Nominatim untersagt das
+// ausdruecklich, darum hier ein anderer Dienst als bei der eigentlichen Suche.
+const PHOTON = 'https://photon.komoot.io/api/';
+let vorschlagLauf = null, vorschlagUhr = null, vorschlaege = [];
+
+function vorschlaegeVerbergen() {
+  $('vorschlaege').hidden = true;
+  $('vorschlaege').innerHTML = '';
+}
+
+function vorschlaegeZeigen() {
+  if (!vorschlaege.length) return vorschlaegeVerbergen();
+  $('vorschlaege').innerHTML = vorschlaege.map(function (v, i) {
+    return '<li><button type="button" data-vorschlag="' + i + '">' + sicher(v.titel)
+      + (v.ort ? '<span class="ort">' + sicher(v.ort) + '</span>' : '') + '</button></li>';
+  }).join('');
+  $('vorschlaege').hidden = false;
+}
+
+async function vorschlaegeHolen(text) {
+  if (vorschlagLauf) vorschlagLauf.abort();
+  vorschlagLauf = new AbortController();
+  try {
+    const res = await fetch(PHOTON + '?limit=6&lang=de&q=' + encodeURIComponent(text),
+      { signal: vorschlagLauf.signal });
+    if (!res.ok) return vorschlaegeVerbergen();
+    const daten = await res.json();
+    vorschlaege = (daten.features || [])
+      .filter(function (f) {
+        return ['DE', 'AT', 'IT'].indexOf((f.properties || {}).countrycode) >= 0;
+      })
+      .map(function (f) {
+        const e = f.properties || {};
+        const strasse = [e.street, e.housenumber].filter(Boolean).join(' ');
+        const titel = e.name || strasse || e.city || e.county || 'Ohne Namen';
+        const ort = [strasse !== titel ? strasse : '', e.postcode, e.city || e.county, e.state]
+          .filter(Boolean).join(', ');
+        return { titel: titel, ort: ort, lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
+      });
+    vorschlaegeZeigen();
+  } catch (e) {
+    if (e.name !== 'AbortError') vorschlaegeVerbergen();
+  }
+}
+
+$('eingabe').addEventListener('input', function () {
+  const text = $('eingabe').value.trim();
+  clearTimeout(vorschlagUhr);
+  if (text.length < 3) return vorschlaegeVerbergen();
+  vorschlagUhr = setTimeout(function () { vorschlaegeHolen(text); }, 300);
+});
+
+// Ein Vorschlag bringt die Koordinaten schon mit - die Adresssuche entfaellt.
+$('vorschlaege').addEventListener('click', function (e) {
+  const b = e.target.closest('[data-vorschlag]');
+  if (!b) return;
+  const v = vorschlaege[+b.dataset.vorschlag];
+  if (!v) return;
+  vorschlaegeVerbergen();
+  $('eingabe').value = v.titel + (v.ort ? ', ' + v.ort : '');
+  $('eingabe').blur();
+  stimmeFreischalten();
+  suchNr++;
+  radius = 1000;
+  ziel = { lat: v.lat, lon: v.lon, kurz: v.titel };
+  laden();
+});
+
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('#vorschlaege') && e.target !== $('eingabe')) vorschlaegeVerbergen();
+});
+
 $('formular').onsubmit = async function (e) {
   e.preventDefault();
   const text = $('eingabe').value.trim();
   if (!text) return;
   stimmeFreischalten();
+  vorschlaegeVerbergen();
+  clearTimeout(vorschlagUhr);
   $('eingabe').blur();
   suchNr++;                 // eine noch laufende Standortabfrage wird damit entwertet
   radius = 1000;
@@ -685,29 +960,58 @@ $('formular').onsubmit = async function (e) {
   }
 };
 
+const ORT_FEHLER = {
+  1: 'Ortung ist für diese Seite gesperrt. In den Browser-Einstellungen unter Berechtigungen wieder erlauben.',
+  2: 'Kein Standort verfügbar. Ist die Ortung am Gerät eingeschaltet?',
+  3: 'Die Standortbestimmung hat zu lange gedauert. Am Fenster oder im Freien nochmal versuchen.',
+};
+
 function standortSuchen() {
   if (!navigator.geolocation) return zeigen('Dieses Gerät gibt den Standort nicht heraus.', true);
   const meine = ++suchNr;
   zeigen('Bestimme Standort …');
-  navigator.geolocation.getCurrentPosition(
-    function (pos) {
+
+  const nehmen = function (pos) {
+    if (meine !== suchNr) return;
+    radius = 1000;
+    ziel = { lat: pos.coords.latitude, lon: pos.coords.longitude, kurz: 'deinem Standort' };
+    laden();
+  };
+  const aufgeben = function (f) {
+    if (meine !== suchNr) return;
+    zeigen((ORT_FEHLER[f && f.code] || 'Standort nicht verfügbar.')
+      + '<button class="zweit" type="button" onclick="standortSuchen()">Nochmal versuchen</button>', true);
+  };
+
+  // Erst genau ueber GPS, dann grob ueber Funkzelle und WLAN. In der Tiefgarage oder
+  // zwischen Haeuserzeilen liefert GPS oft gar nichts, die grobe Ortung aber schon.
+  navigator.geolocation.getCurrentPosition(nehmen,
+    function (f) {
       if (meine !== suchNr) return;
-      radius = 1000;
-      ziel = { lat: pos.coords.latitude, lon: pos.coords.longitude, kurz: 'deinem Standort' };
-      laden();
+      if (f && f.code === 1) return aufgeben(f);       // gesperrt bleibt gesperrt
+      zeigen('GPS meldet sich nicht, versuche die grobe Ortung …');
+      navigator.geolocation.getCurrentPosition(nehmen, aufgeben,
+        { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 });
     },
-    function () {
-      if (meine !== suchNr) return;
-      zeigen('Standort nicht verfügbar — Ortungsfreigabe prüfen, oder Ziel oben eintippen.'
-        + '<button class="zweit" type="button" onclick="standortSuchen()">Standort nochmal versuchen</button>', true);
-    },
-    { enableHighAccuracy: true, timeout: 10000 });
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
 }
 $('hier').onclick = function () { stimmeFreischalten(); standortSuchen(); };
 
 $('weiter').onclick = function () { radius *= 2; laden(); };
 
-['fKostenlos', 'fAnwohner', 'fAnsage'].forEach(function (id) {
+// Dieselbe Dauer nochmal antippen schaltet zurueck auf Sortierung nach Entfernung.
+$('dauer').addEventListener('click', function (e) {
+  const b = e.target.closest('[data-min]');
+  if (!b) return;
+  const m = +b.dataset.min;
+  dauerMinuten = (dauerMinuten === m) ? 0 : m;
+  Array.prototype.forEach.call($('dauer').querySelectorAll('[data-min]'), function (x) {
+    x.setAttribute('aria-pressed', (+x.dataset.min === dauerMinuten) ? 'true' : 'false');
+  });
+  zeichnen(false);
+});
+
+['fKostenlos', 'fAnwohner', 'fKunden', 'fAnsage'].forEach(function (id) {
   $(id).onclick = function (e) {
     const b = e.currentTarget;
     b.setAttribute('aria-pressed', an(id) ? 'false' : 'true');
