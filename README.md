@@ -29,8 +29,16 @@ OpenStreetMap erfasst die nur lückenhaft. Darauf verlässt sich die App nicht.
 Danach eigenes Symbol, Vollbild, kein Browser-Rahmen.
 
 **Als APK (Android):** unter [Releases](../../releases) liegt `parkfuchs.apk`. Herunterladen,
-Installation aus unbekannten Quellen erlauben, installieren. Das Paket ist debug-signiert —
-zum Selbstinstallieren gedacht, nicht für den Play Store.
+Installation aus unbekannten Quellen erlauben, installieren. Bei neueren Samsung-Geräten muss
+zusätzlich die „Automatische Blockierung“ unter Sicherheit aus sein.
+
+Das Paket ist ein Release-Bau, fest signiert mit einem Schlüssel aus den Repo-Geheimnissen
+(nie im Repo selbst). Dadurch lässt sich eine neue Fassung über eine installierte legen, ohne
+vorher zu deinstallieren; die Versionsnummer zählt mit jedem Bau hoch. Für den Play Store
+wäre es trotzdem nicht gedacht.
+
+Meldet das Handy „Problem beim Parsen des Pakets“, ist fast immer der Download unvollständig:
+Größe und SHA-256 stehen in der Freigabe-Beschreibung, beides lässt sich vergleichen.
 
 ## Datenquellen
 
