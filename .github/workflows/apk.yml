@@ -50,16 +50,40 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
+          cd ..
+          mv android/app/build/outputs/apk/debug/app-debug.apk parkfuchs.apk
+
+      # Das fertige Paket selbst pruefen, statt darauf zu vertrauen, dass der Bau
+      # schon stimmt. Schlaegt eine dieser Pruefungen fehl, gibt es keine Freigabe.
+      - name: APK pruefen
+        run: |
+          WERKZEUG=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n1)
+          echo "--- Eckdaten"
+          "$WERKZEUG/aapt2" dump badging parkfuchs.apk \
+            | grep -E "^(package|sdkVersion|targetSdkVersion|application-label:)"
+          echo "--- Signatur"
+          "$WERKZEUG/apksigner" verify --verbose parkfuchs.apk
+          echo "--- Groesse und Pruefsumme"
+          ls -l parkfuchs.apk | awk '{print $5 " Bytes"}'
+          sha256sum parkfuchs.apk | tee pruefsumme.txt
 
       - name: Zum Herunterladen bereitstellen
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mv android/app/build/outputs/apk/debug/app-debug.apk parkfuchs.apk
-          gh release create apk \
-            --title "Parkfuchs - aktueller Stand" \
-            --notes "Automatisch gebaut. Debug-signiert: zum Selbstinstallieren gedacht, nicht fuer den Play Store. Auf dem Handy muss die Installation aus unbekannten Quellen erlaubt sein." \
-            || echo "Freigabe besteht bereits, es wird nur die Datei ersetzt"
+          SUMME=$(cut -d' ' -f1 pruefsumme.txt)
+          GROESSE=$(stat -c%s parkfuchs.apk)
+          TEXT="Automatisch gebaut und geprueft (Signatur, Mindestversion, Vollstaendigkeit).
+
+          Groesse: $GROESSE Bytes
+          SHA-256: $SUMME
+
+          Debug-signiert: zum Selbstinstallieren gedacht, nicht fuer den Play Store.
+          Auf dem Handy muss die Installation aus unbekannten Quellen erlaubt sein.
+          Bei 'Problem beim Parsen des Pakets' ist fast immer der Download unvollstaendig -
+          Dateigroesse vergleichen und ueber WLAN erneut laden."
+          gh release create apk --title "Parkfuchs - aktueller Stand" --notes "$TEXT" \
+            || gh release edit apk --title "Parkfuchs - aktueller Stand" --notes "$TEXT"
           gh release upload apk parkfuchs.apk --clobber
 
       - name: APK auch als Artefakt sichern
