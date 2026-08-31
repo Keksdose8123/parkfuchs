@@ -35,7 +35,7 @@ jobs:
       - name: Web-Dateien einsammeln
         run: |
           mkdir -p www
-          cp index.html park.js navi.js manifest.json preise.json favicon.png icon-*.png www/
+          cp index.html park.js navi.js stimme.js manifest.json preise.json favicon.png icon-*.png www/
           ls -1 www/
 
       - name: Android-Projekt erzeugen

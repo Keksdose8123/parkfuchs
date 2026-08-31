@@ -10,6 +10,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#16583f">
+<!-- Das Sprachmodul importiert "onnxruntime-web" als blanken Namen. Ohne Buendler
+     braucht der Browser diese Zuordnung, sonst scheitert der Import. -->
+<script type="importmap">
+{ "imports": { "onnxruntime-web": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/esm/ort.wasm.min.js" } }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700;800&display=swap">
@@ -270,6 +275,7 @@ li.neu{animation:einfahren .32s cubic-bezier(.2,.7,.3,1) backwards}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="park.js"></script>
 <script src="navi.js"></script>
+<script src="stimme.js"></script>
 <script>
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
 const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
@@ -286,6 +292,9 @@ let radius = 1000, ziel = null, treffer = [], privatAus = 0, angezeigt = [];
 // spaete Antwort das Ergebnis nicht mehr ueberschreiben.
 let suchNr = 0;
 let landkarte = null, ebene = null, marker = [], gewaehlt = -1, ring = null;
+// Muss vor stimmeWaehlen() stehen: das laeuft beim Start und greift darauf zu.
+const PIPER_WERT = '__piper__';
+let piperDa = false, piperGewaehlt = false;
 // Preise liegen als Datei neben der App - vom eigenen Server, darum ohne Browsersperre.
 let preistabelle = null, dauerMinuten = 0;
 fetch('preise.json')
@@ -341,11 +350,11 @@ function deutscheStimmen() {
 // deshalb kann darunter jede vorhandene Stimme von Hand gewaehlt werden.
 function stimmeWaehlen() {
   const deutsch = deutscheStimmen();
-  if (!deutsch.length) return;
   const eigene = gemerkt('stimme');
+  if (eigene === PIPER_WERT) piperGewaehlt = true;
   const gefunden = eigene && deutsch.find(v => v.name === eigene);
   if (gefunden) { stimme = gefunden; }
-  else {
+  else if (deutsch.length) {
     const punkte = v => (/neural|premium|enhanced|siri/i.test(v.name) ? 4 : 0)
                       + (/google/i.test(v.name) ? 3 : 0)
                       + (/helena|anna|petra|katja|markus|conrad|vicki/i.test(v.name) ? 2 : 0)
@@ -356,45 +365,90 @@ function stimmeWaehlen() {
 }
 
 function stimmenListeFuellen(deutsch) {
-  if (deutsch.length < 2) return;                 // ohne Auswahl keine Auswahlliste
-  $('stimmenwahl').innerHTML = deutsch.map(function (v) {
-    return '<option value="' + sicher(v.name) + '">' + sicher(v.name) + '</option>';
-  }).join('');
-  if (stimme) $('stimmenwahl').value = stimme.name;
+  const optionen = ['<option value="' + PIPER_WERT + '">Thorsten — natürlich, offline'
+    + (piperDa ? '' : ' (' + PIPER_MB + ' MB laden)') + '</option>'];
+  deutsch.forEach(function (v) {
+    optionen.push('<option value="' + sicher(v.name) + '">' + sicher(v.name) + '</option>');
+  });
+  $('stimmenwahl').innerHTML = optionen.join('');
+  $('stimmenwahl').value = piperGewaehlt ? PIPER_WERT : (stimme ? stimme.name : PIPER_WERT);
   $('stimmzeile').classList.add('an');
+}
+
+function piperAnbieten() {
+  zeigen('Die natürliche Stimme braucht ein Sprachmodell von rund ' + PIPER_MB
+    + ' MB. Am besten über WLAN laden — danach spricht sie auch ohne Netz.'
+    + '<button class="zweit" type="button" onclick="piperJetztLaden()">'
+    + PIPER_MB + ' MB jetzt laden</button>');
+}
+
+async function piperJetztLaden() {
+  zeigen('Lade Sprachmodell … 0 %');
+  try {
+    await piperHerunterladen(function (anteil) {
+      zeigen('Lade Sprachmodell … ' + Math.round(anteil * 100) + ' %');
+    });
+    piperDa = true;
+    stimmeWaehlen();
+    zeigen('Sprachmodell geladen. Es liegt jetzt auf dem Gerät und braucht kein Netz mehr.');
+    probeSprechen();
+  } catch (e) {
+    zeigen('Sprachmodell konnte nicht geladen werden: ' + sicher((e && e.message) || e), true);
+  }
 }
 
 stimmeWaehlen();
 if (window.speechSynthesis) speechSynthesis.onvoiceschanged = stimmeWaehlen;
+piperVorhanden().then(function (da) { piperDa = da; stimmeWaehlen(); });
 
 $('stimmenwahl').onchange = function () {
-  stimme = deutscheStimmen().find(v => v.name === $('stimmenwahl').value) || stimme;
-  gemerkt('stimme', $('stimmenwahl').value);
+  const wert = $('stimmenwahl').value;
+  if (wert === PIPER_WERT) {
+    piperGewaehlt = true;
+    gemerkt('stimme', PIPER_WERT);
+    if (!piperDa) return piperAnbieten();
+  } else {
+    piperGewaehlt = false;
+    stimme = deutscheStimmen().find(v => v.name === wert) || stimme;
+    gemerkt('stimme', wert);
+  }
   probeSprechen();
 };
 $('stimmProbe').onclick = probeSprechen;
 
-// Die Probe spricht auch, wenn die Ansagen aus sind - sonst waere sie stumm.
 function probeSprechen() {
-  if (!window.speechSynthesis) return;
   stimmeFreischalten();
-  const sprich = new SpeechSynthesisUtterance(
-    'In 300 Metern rechts abbiegen, auf die Bahnhofstraße. Danach ist dein Ziel erreicht.');
-  sprich.lang = 'de-DE';
-  if (stimme) sprich.voice = stimme;
-  sprich.rate = 0.96;
-  speechSynthesis.cancel();
-  speechSynthesis.speak(sprich);
+  sprechen('In 300 Metern rechts abbiegen, auf die Bahnhofstraße. Danach ist dein Ziel erreicht.');
 }
 
+// ansagen() achtet auf den Ansage-Schalter, sprechen() nicht - die Hoerprobe
+// soll auch dann klingen, wenn die Ansagen gerade aus sind.
 function ansagen(text) {
-  if (!an('fAnsage') || !window.speechSynthesis) return;
-  const sprich = new SpeechSynthesisUtterance(vorlesbar(text));
+  if (an('fAnsage')) sprechen(text);
+}
+
+async function sprechen(text) {
+  const satz = vorlesbar(text);
+  if (piperGewaehlt && piperDa) {
+    try { await piperSprechen(satz); return; }
+    catch (e) { /* faellt still auf die Geraetestimme zurueck - stumm waere schlimmer */ }
+  }
+  geraetSprechen(satz);
+}
+
+function geraetSprechen(satz) {
+  if (!window.speechSynthesis) return;
+  const sprich = new SpeechSynthesisUtterance(satz);
   sprich.lang = 'de-DE';
   if (stimme) sprich.voice = stimme;
   sprich.rate = 0.96;      // eine Spur ruhiger als die Vorgabe, klingt weniger gehetzt
   speechSynthesis.cancel();
   speechSynthesis.speak(sprich);
+}
+
+function alleStimmenStumm() {
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (typeof piperStumm === 'function') piperStumm();
 }
 
 function fundAnsage(p) {
@@ -710,6 +764,19 @@ const fuehrung = { route: null, ziel: null, schritt: 1, gesagt: {},
 
 const punktVon = s => [s.maneuver.location[1], s.maneuver.location[0]];   // OSRM: lon,lat
 
+// Die naechsten Ansagen im Voraus erzeugen lassen. Betrifft nur die natuerliche
+// Stimme - die Geraetestimme spricht ohnehin sofort.
+function ansagenVorbereiten(ab) {
+  if (!piperGewaehlt || !piperDa || !fuehrung.route) return;
+  const schritte = fuehrung.route.schritte;
+  const saetze = [];
+  for (let j = ab; j < Math.min(ab + 3, schritte.length); j++) {
+    saetze.push(vorlesbar(ansageText(schritte[j], 300)));
+    saetze.push(vorlesbar(ansageText(schritte[j], 30)));
+  }
+  piperVorbereiten(saetze);
+}
+
 async function wachHalten() {
   // Ohne Wake Lock geht der Bildschirm waehrend der Fahrt aus. Nicht ueberall vorhanden.
   try {
@@ -760,6 +827,8 @@ async function naviStarten(p) {
       routeMalen();
       ichMalen([pos.coords.latitude, pos.coords.longitude]);
       wachHalten();
+      if (typeof piperVorratLeeren === 'function') piperVorratLeeren();
+      ansagenVorbereiten(fuehrung.schritt);
       zeigen('Navigation läuft zu <b>' + sicher(p.name || p.art) + '</b>.');
       // Anzeige sofort aus der Startposition fuellen, nicht auf die erste Ortungsmeldung
       // warten - sonst steht sekundenlang "wird berechnet", obwohl die Route fertig ist.
@@ -782,6 +851,8 @@ async function neuBerechnen(ich) {
     fuehrung.schritt = Math.min(1, fuehrung.route.schritte.length - 1);
     fuehrung.gesagt = {};
     routeMalen();
+    if (typeof piperVorratLeeren === 'function') piperVorratLeeren();
+    ansagenVorbereiten(fuehrung.schritt);
     ansagen('Route wird neu berechnet.');
   } catch (e) {
     $('fAnweisung').textContent = 'Neuberechnung fehlgeschlagen';
@@ -822,10 +893,13 @@ function naviPosition(pos, stumm) {
   const sek = r.meter ? Math.round(r.sekunden * (rest / r.meter)) : 0;
   $('fRest').textContent = 'noch ' + fahrstrecke(rest) + ' · ' + fahrzeit(sek);
 
+  // Feste Ansageentfernungen statt des krummen Istwerts: nur dann stehen die Saetze
+  // schon bei Routenbeginn fest und lassen sich vorab erzeugen.
   const flag = fuehrung.gesagt[i] || {};
-  if (d < 300 && !flag.fern) { flag.fern = true; if (!stumm) ansagen(ansageText(naechster, d)); }
-  if (d < 45 && !flag.nah) { flag.nah = true; if (!stumm) ansagen(ansageText(naechster, d)); }
+  if (d < 300 && !flag.fern) { flag.fern = true; if (!stumm) ansagen(ansageText(naechster, 300)); }
+  if (d < 45 && !flag.nah) { flag.nah = true; if (!stumm) ansagen(ansageText(naechster, 30)); }
   fuehrung.gesagt[i] = flag;
+  ansagenVorbereiten(i);
 
   if (i === r.schritte.length - 1 && d < 30) {
     ansagen('Ziel erreicht. Viel Glück beim Einparken.');
@@ -843,7 +917,7 @@ function naviBeenden() {
   fuehrung.route = null;
   $('fuehrung').hidden = true;
   document.body.classList.remove('navi');
-  if (window.speechSynthesis) speechSynthesis.cancel();
+  alleStimmenStumm();
 }
 
 $('fEnde').onclick = function () { naviBeenden(); zeigen('Navigation beendet.'); };
@@ -1015,7 +1089,7 @@ $('dauer').addEventListener('click', function (e) {
   $(id).onclick = function (e) {
     const b = e.currentTarget;
     b.setAttribute('aria-pressed', an(id) ? 'false' : 'true');
-    if (id === 'fAnsage') { if (!an(id) && window.speechSynthesis) speechSynthesis.cancel(); return; }
+    if (id === 'fAnsage') { if (!an(id)) alleStimmenStumm(); return; }
     zeichnen(false);
   };
 });

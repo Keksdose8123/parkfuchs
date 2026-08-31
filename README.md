@@ -40,6 +40,22 @@ wäre es trotzdem nicht gedacht.
 Meldet das Handy „Problem beim Parsen des Pakets“, ist fast immer der Download unvollständig:
 Größe und SHA-256 stehen in der Freigabe-Beschreibung, beides lässt sich vergleichen.
 
+## Sprachansagen
+
+Standardmäßig spricht die Stimme des Geräts. Auf Android hängt deren Qualität an der
+installierten Sprachausgabe — unter *Einstellungen → Allgemeine Verwaltung → Sprache →
+Text-zu-Sprache* lohnt sich die Google-Sprachausgabe mit den hochwertigen deutschen Daten.
+
+Wahlweise **Thorsten** (Piper, gemeinfreie deutsche Stimme): rechnet auf dem Gerät und
+spricht danach ohne Netz. Das Sprachmodell wiegt rund 60 MB und wird einmalig in der App
+geladen, nicht ins Paket gebacken — sonst wäre jede Aktualisierung ein 90-MB-Download.
+
+Gemessen braucht die Erzeugung rund sechs Sekunden je Satz, weil die Rechenlaufzeit im
+Browser einfädig läuft. Mehrfädig ginge nur mit Sicherheitskopfzeilen, die GitHub Pages
+nicht setzen kann und die zusätzlich die Kartenkacheln blockieren würden. Gelöst ist das
+anders: sobald die Route steht, stehen auch alle Ansagen fest — sie werden im Voraus
+erzeugt und liegen bereit, wenn sie gebraucht werden. Abruf dann: 0 ms.
+
 ## Datenquellen
 
 | Zweck | Dienst |
